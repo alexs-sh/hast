@@ -5,7 +5,7 @@ stages:
 .base:
   image: alexshcdr/rust-debian11
   artifacts:
-    name: ${CI_JOB_NAME}-${CI_COMMIT_SHA}
+    name: ${CI_JOB_NAME}-hast-${CI_COMMIT_SHA}
     expire_in: 1 days
   tags:
     - docker
@@ -16,9 +16,12 @@ x86_64-debian:11:
   script:
     - cargo build --release
     - cargo test --release
+    - mkdir output
+    - cp scripts/* output
+    - cp target/release/hast output
   artifacts:
     paths:
-    - target/release/hast
+    - output
 
 x86_64-centos:7:
   extends: .base
@@ -27,9 +30,12 @@ x86_64-centos:7:
   script:
     - cargo build --release
     - cargo test --release
+    - mkdir output
+    - cp scripts/* output
+    - cp target/release/hast output
   artifacts:
     paths:
-    - target/release/hast
+    - output
 
 
 clippy:
