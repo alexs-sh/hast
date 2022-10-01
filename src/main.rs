@@ -1,6 +1,8 @@
+mod ids;
 mod logger;
 mod server;
 mod storage;
+
 use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "hast", about = "HAsh STorage")]
@@ -21,6 +23,7 @@ struct Options {
     )]
     server: String,
 }
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let options = Options::from_args();
