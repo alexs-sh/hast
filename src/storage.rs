@@ -8,16 +8,29 @@ use std::io;
 use std::io::{Read, Write};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Info {
     pub id: String,
     pub host: Option<String>,
     pub timestamp: Option<String>,
 }
 
+impl Info {
+    pub fn new(id: &str) -> Info {
+        Info {
+            id: id.to_owned(),
+            host: None,
+            timestamp: None,
+        }
+    }
+
+    pub fn id(&self) -> &String {
+        &self.id
+    }
+}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ObjectHash {
-    pub object: String,
+    pub name: String,
     pub hash: String,
 }
 
