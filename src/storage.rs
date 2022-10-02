@@ -16,6 +16,15 @@ pub struct Info {
     pub timestamp: Option<String>,
 }
 
+impl Info {
+    pub fn new(id: &str) -> Info {
+        Info {
+            id: id.to_owned(),
+            host: None,
+            timestamp: None,
+        }
+    }
+}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ObjectHash {
     pub object: String,
