@@ -2,7 +2,7 @@ use crate::recordsets::RecordSet;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::io;
@@ -44,6 +44,7 @@ pub struct LookupRequest {
 #[derive(Serialize, Deserialize)]
 pub struct LookupResponse {
     pub records: Vec<Info>,
+    pub locations: Vec<String>,
 }
 impl LookupResponse {
     pub fn to_json(&self) -> String {
@@ -82,21 +83,31 @@ impl Storage for SimpleStorage {
 
     fn lookup(&self, data: LookupRequest) -> Option<LookupResponse> {
         let mut records = HashMap::new();
+        let mut locations = HashSet::new();
         for hash in data.hashes.iter() {
-            if let Some((info, _)) = self.recordset.get_by_hash(hash) {
+            if let Some((info, names)) = self.recordset.get_by_hash(hash) {
                 info.iter().for_each(|info| {
                     records.entry(&info.id).or_insert(*info);
+                });
+
+                names.iter().for_each(|name| {
+                    locations.insert(*name);
                 });
             };
         }
 
-        let payload = records.iter().fold(Vec::new(), |mut acc, (_, info)| {
+        let records = records.iter().fold(Vec::new(), |mut acc, (_, info)| {
             acc.push((*info).clone());
             acc
         });
 
-        if !payload.is_empty() {
-            let result = LookupResponse { records: payload };
+        let locations = locations.iter().fold(Vec::new(), |mut acc, location| {
+            acc.push((*location).clone());
+            acc
+        });
+
+        if !records.is_empty() {
+            let result = LookupResponse { records, locations };
             Some(result)
         } else {
             None
