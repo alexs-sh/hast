@@ -43,7 +43,7 @@ pub struct LookupRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct LookupResponse {
-    pub records: Vec<Info>,
+    pub reports: Vec<Info>,
     pub locations: Vec<String>,
 }
 impl LookupResponse {
@@ -82,12 +82,12 @@ impl Storage for SimpleStorage {
     }
 
     fn lookup(&self, data: LookupRequest) -> Option<LookupResponse> {
-        let mut records = HashMap::new();
+        let mut reports = HashMap::new();
         let mut locations = HashSet::new();
         for hash in data.hashes.iter() {
             if let Some((info, names)) = self.recordset.get_by_hash(hash) {
                 info.iter().for_each(|info| {
-                    records.entry(&info.id).or_insert(*info);
+                    reports.entry(&info.id).or_insert(*info);
                 });
 
                 names.iter().for_each(|name| {
@@ -96,7 +96,7 @@ impl Storage for SimpleStorage {
             };
         }
 
-        let records = records.iter().fold(Vec::new(), |mut acc, (_, info)| {
+        let reports = reports.iter().fold(Vec::new(), |mut acc, (_, info)| {
             acc.push((*info).clone());
             acc
         });
@@ -106,8 +106,8 @@ impl Storage for SimpleStorage {
             acc
         });
 
-        if !records.is_empty() {
-            let result = LookupResponse { records, locations };
+        if !reports.is_empty() {
+            let result = LookupResponse { reports, locations };
             Some(result)
         } else {
             None
