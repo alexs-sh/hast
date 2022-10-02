@@ -3,6 +3,9 @@
 Dummy hash storage. It allows saving / restoring / searching hashes of files
 using JSON over HTTP.
 
+[![Build Status](https://gitlab.com/alexssh/hast/badges/master/pipeline.svg)](https://gitlab.com/alexssh/hast/-/commits/master)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ### Example
 
 Running server
