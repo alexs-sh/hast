@@ -57,7 +57,7 @@ impl InsertJson {
                     let hash = line[..delim].trim();
                     let object = line[delim..].trim();
                     let record = ObjectHash {
-                        name: object.to_owned(),
+                        object: object.to_owned(),
                         hash: hash.to_owned(),
                     };
                     acc.push(record);

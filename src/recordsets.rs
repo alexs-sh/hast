@@ -1,9 +1,8 @@
 use crate::storage::{Info, ObjectHash};
-
+use log::{info, warn};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-
 pub type Id = u64;
 
 fn append<T>(storage: &mut HashMap<Id, HashSet<T>>, key: Id, value: T)
@@ -29,10 +28,6 @@ fn id_from_str(value: &str) -> Id {
 }
 
 type IdStorage = HashMap<Id, String>;
-struct HashData {
-    report_id: Id,
-    file_id: Id,
-}
 
 pub struct RecordSet {
     // Full data info
@@ -60,27 +55,47 @@ impl RecordSet {
         }
     }
 
-    pub fn insert(&mut self, info: &Info, objects: &[ObjectHash]) {
+    pub fn insert(&mut self, info: &Info, objects: &[ObjectHash]) -> bool {
+        let mut changed = false;
         let report_id = id_from_str(&info.id); // make record id
 
-        self.reports.entry(report_id).or_insert_with(|| {
-            // write all name/hash ids
-            for object in objects {
-                let name_id = id_from_str(&object.name);
-                let hash_id = id_from_str(&object.hash);
+        self.reports
+            .entry(report_id)
+            .and_modify(|_| {
+                warn!("skip report '{}'. Already in a storage", info.id);
+            })
+            .or_insert_with(|| {
+                info!(
+                    "insert report '{}' with {} record(s)",
+                    info.id,
+                    objects.len()
+                );
+                // write all name/hash ids
+                for object in objects {
+                    let name_id = id_from_str(&object.object);
+                    let hash_id = id_from_str(&object.hash);
 
-                self.name_ids
-                    .entry(name_id)
-                    .or_insert_with(|| object.name.clone());
-                self.hash_ids
-                    .entry(hash_id)
-                    .or_insert_with(|| object.hash.clone());
+                    self.name_ids
+                        .entry(name_id)
+                        .or_insert_with(|| object.object.clone());
+                    self.hash_ids
+                        .entry(hash_id)
+                        .or_insert_with(|| object.hash.clone());
 
-                append(&mut self.hash_to_report, hash_id, report_id);
-                append(&mut self.hash_to_name, hash_id, name_id);
-            }
-            info.clone()
-        });
+                    append(&mut self.hash_to_report, hash_id, report_id);
+                    append(&mut self.hash_to_name, hash_id, name_id);
+                }
+                changed = true;
+                info.clone()
+            });
+
+        info!(
+            "number of (reports,hashes,names):({},{},{})",
+            self.reports.len(),
+            self.hash_ids.len(),
+            self.name_ids.len()
+        );
+        changed
     }
 
     pub fn get_by_hash(&self, name: &str) -> Option<(Vec<&Info>, Vec<&String>)> {
@@ -117,13 +132,13 @@ mod test {
         let mut records = RecordSet::new();
         let info1 = Info::new("report1");
         let objects1 = ObjectHash {
-            name: "report1-file".to_owned(),
+            object: "report1-file".to_owned(),
             hash: "1234".to_owned(),
         };
 
         let info2 = Info::new("report2");
         let objects2 = ObjectHash {
-            name: "report2-file".to_owned(),
+            object: "report2-file".to_owned(),
             hash: "2345".to_owned(),
         };
 

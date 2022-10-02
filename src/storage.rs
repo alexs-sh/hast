@@ -1,36 +1,24 @@
+use crate::recordsets::RecordSet;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{Read, Write};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Info {
     pub id: String,
     pub host: Option<String>,
     pub timestamp: Option<String>,
 }
 
-impl Info {
-    pub fn new(id: &str) -> Info {
-        Info {
-            id: id.to_owned(),
-            host: None,
-            timestamp: None,
-        }
-    }
-
-    pub fn id(&self) -> &String {
-        &self.id
-    }
-}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ObjectHash {
-    pub name: String,
+    pub object: String,
     pub hash: String,
 }
 
@@ -80,8 +68,7 @@ impl Storage for EmptyStorage {
 }
 
 pub struct SimpleStorage {
-    records: HashMap<String, InsertRequest>, //info -> set of hash
-    hashes: HashMap<String, HashSet<String>>, // hash -> set of records
+    recordset: RecordSet,
     workdir: String,
 }
 
@@ -94,26 +81,25 @@ impl Storage for SimpleStorage {
     }
 
     fn lookup(&self, data: LookupRequest) -> Option<LookupResponse> {
-        let mut infos = HashMap::new();
-        info!("requested {} hash(es)", data.hashes.len());
-        for hash in data.hashes {
-            if let Some(records) = self.hashes.get(&hash) {
-                for id in records {
-                    let info = self.records.get(id).unwrap();
-                    infos.insert(id, info.info.clone());
-                }
-            }
+        let mut records = HashMap::new();
+        for hash in data.hashes.iter() {
+            if let Some((info, _)) = self.recordset.get_by_hash(hash) {
+                info.iter().for_each(|info| {
+                    records.entry(&info.id).or_insert(*info);
+                });
+            };
         }
-        let records = infos.iter().fold(Vec::new(), |mut acc, (_, v)| {
-            acc.push(v.clone());
+
+        let payload = records.iter().fold(Vec::new(), |mut acc, (_, info)| {
+            acc.push((*info).clone());
             acc
         });
 
-        info!("found {} record(s)", records.len());
-        if records.is_empty() {
-            None
+        if !payload.is_empty() {
+            let result = LookupResponse { records: payload };
+            Some(result)
         } else {
-            Some(LookupResponse { records })
+            None
         }
     }
 }
@@ -121,8 +107,7 @@ impl Storage for SimpleStorage {
 impl SimpleStorage {
     pub fn new(workdir: &str) -> SimpleStorage {
         SimpleStorage {
-            records: HashMap::new(),
-            hashes: HashMap::new(),
+            recordset: RecordSet::new(),
             workdir: workdir.to_owned(),
         }
     }
@@ -158,7 +143,7 @@ impl SimpleStorage {
         for path in paths {
             let _ = path.map(|p| {
                 read_file(p.path().as_path()).map(|data| {
-                    self.insert(data);
+                    self.save_mem(&data);
                 })
             });
         }
@@ -175,7 +160,7 @@ impl SimpleStorage {
         let name = hash.to_string();
 
         info!(
-            "saving '{}' with {} record(s) to file",
+            "saving '{}' with {} record(s) to a file",
             data.info.id,
             data.records.len()
         );
@@ -200,29 +185,6 @@ impl SimpleStorage {
     }
 
     fn save_mem(&mut self, data: &InsertRequest) -> bool {
-        // make hash->records links
-        data.records.iter().for_each(|rec| {
-            let hash = &rec.hash;
-            if let Some(records) = self.hashes.get_mut(hash) {
-                records.insert(data.info.id.clone());
-            } else {
-                self.hashes
-                    .insert(hash.clone(), HashSet::from_iter(vec![data.info.id.clone()]));
-            }
-        });
-
-        // fill records info
-        let mut result = false;
-        self.records
-            .entry(data.info.id.clone())
-            .and_modify(|e| {
-                warn!("record '{}' exists. Skip it", e.info.id);
-            })
-            .or_insert_with(|| {
-                info!("insert record '{}'", data.info.id);
-                result = true;
-                data.clone()
-            });
-        result
+        self.recordset.insert(&data.info, &data.records)
     }
 }
